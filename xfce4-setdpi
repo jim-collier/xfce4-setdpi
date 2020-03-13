@@ -1,0 +1,2443 @@
+#!/bin/bash
+
+	#########################################################################################
+	##	Purpose:
+	##		- [See fDescriptionAndCopyright below.]
+	##	TODO:
+	##		- Allow input with ending "%", rather than dpi (as a plain integer).
+	##	History:
+	##		- 20160922 JC: Created based on TEMPLATE_simple_v20160905.
+	##		- 20200115 JC: Renamed from jc* to x9*.
+	#########################################################################################
+
+	## Template settings
+	function fDescriptionAndCopyright() {
+		fEcho_Clean "Sets various things related to screen DPI, depending on distribution."
+	}
+	function fSyntax() { :;
+		fEcho_Clean "Parameters:"
+		fEcho_Clean "  1 [REQUIRED]: Pixel density in DPI. Examples:"
+		fEcho_Clean "      96 ... Standard PC display"
+		fEcho_Clean "      72 ... Old Macintosh displays"
+		fEcho_Clean "     144 ... 1.5x denser than standard DPI"
+		fEcho_Clean "     192 ... Double density [e.g. ${cmsDoubleQuote_Open}Retina${cmsDoubleQuote_Close}]"
+	}
+	declare -r cmwNumberOfRequiredArgs=1
+	declare -r cmbAlwaysShowDescriptionAndCopyright="true"
+	declare -r cmbEchoAndDo_EchoOnly="false"
+	declare -r cmbDebug="false"
+	declare vmbLessVerbose=""; if [ -n "${JCSETDPI_LESSVERBOSE}" ]; then vmbLessVerbose="${JCSETDPI_LESSVERBOSE}"; else vmbLessVerbose="false"; fi
+
+
+	##---------------------------------------------------------------------------------------
+	function fMain() {
+		fEcho_IfDebug "fMain()"
+		#fEcho "Starting $(fGetFileName_OfMe).fMain"
+		#fEcho ""
+
+		local vlwNewDpi="$1"
+		local clwStandardDpi=96
+		local vlwTmpStandard=0
+		local vlwTmpNewval=0
+
+		if [ "$(fIsInteger "${vlwNewDpi}")" != "true" ]; then
+			fThrowError "Argument must be an integer, typically >= 72. You gave '${vlwNewDpi}'."
+		else
+			if [ $vlwNewDpi -lt 48 ]; then
+				fThrowError "Specified DPI of '${vlwNewDpi}' is too low. Should typically be >= 72. Standard PC is 96."
+			elif [ $vlwNewDpi -gt 10000 ]; then
+				fThrowError "Specified DPI of '${vlwNewDpi}' is implausibly high by mid-2010s standards. Standard PC of early 2010s is 96 dpi. ${cmsDoubleQuote_Open}Retina${cmsDoubleQuote_Close} is in the neighborhood of between 220 to 700 dpi."
+			else
+
+				## Calculate stuff
+				local vlfMultiplier="$(fMath_Calc "${vlwNewDpi}/${clwStandardDpi}" "2")"
+
+				## FYI
+				if [ "${vmbLessVerbose}" != "true" ]; then
+					fEcho "FYI: New DPI ...............: ${vlwNewDpi}"
+					fEcho "FYI: Multiplier ............: ${vlfMultiplier}"
+				fi
+
+				## Per environment
+				local vlsDesktopEnvironment="$(fGetDesktopEnvironment)"
+				fEcho "FYI: Desktop environment ...: ${vlsDesktopEnvironment}"
+				case "${vlsDesktopEnvironment}" in
+
+					"xfce4")      fMain_Xfce4 ;;
+
+					*)            fThrowError "fMain(): Unexpected desktop environment '${vlsDesktopEnvironment}'." ;;
+
+				esac
+
+				#fEcho ""
+				#fEcho "Finished $(fGetFileName_OfMe).fMain"
+			fi
+		fi
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fMain_Xfce4() {
+		## 20160926 JC: 
+
+		## Variables
+		local vlwStandardVal=0
+		local vlwNewVal=0
+
+
+		##------------------------------------------------------------
+		## Set the font
+		fEcho "FYI: Setting xfce4 font DPI to '${vlwNewDpi}' via xfconf-query ..."
+		xfconf-query -c xsettings -p /Xft/DPI -s $vlwNewDpi
+
+
+		##------------------------------------------------------------
+		## Set the panel height
+		vlwStandardVal=26
+		vlwNewVal=0
+		vlwNewVal=$(fMath_Calc $vlwStandardVal*$vlfMultiplier 0)
+		fEcho "FYI: Setting xfce4 panel height to '${vlwNewVal}' via xfconf-query ..."
+		xfconf-query -c xfce4-panel -p /panels/panel-0/size -s $vlwNewVal
+		fDefineTrap_Error_Ignore
+			## These may not exist.
+			xfconf-query -c xfce4-panel -p /panels/panel-1/size -s $vlwNewVal 2> /dev/null
+			xfconf-query -c xfce4-panel -p /panels/panel-2/size -s $vlwNewVal 2> /dev/null
+			xfconf-query -c xfce4-panel -p /panels/panel-3/size -s $vlwNewVal 2> /dev/null
+		fDefineTrap_Error_Fatal
+
+
+		##------------------------------------------------------------
+		## Set the mouse cursor
+		vlwStandardVal=24
+		vlwNewVal=0
+		vlwNewVal=$(fMath_Calc $vlwStandardVal*$vlfMultiplier 0)
+		fEcho "FYI: Setting xfce4 mouse cursor to '${vlwNewVal}' via xfconf-query ..."
+		xfconf-query -c xsettings -p /Gtk/CursorThemeSize -s $vlwNewVal
+
+
+		##------------------------------------------------------------
+		## Set desktop icons
+		vlwStandardVal=48
+		vlwNewVal=0
+		vlwNewVal=$(fMath_Calc $vlwStandardVal*$vlfMultiplier 0)
+		fEcho "FYI: Setting xfce4 desktop icon size to '${vlwNewVal}' via xfconf-query ..."
+		xfconf-query -c xfce4-desktop -p /desktop-icons/icon-size -s $vlwNewVal
+
+
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	##---------------------------------------------------------------------------------------
+	function fCleanup() {
+		if [ "${vmbInSudoSection}" == "true" ]; then
+			## Exiting while running under ExecutionEngine’s sudo loop (not guaranteed to be called - e.g. if already sudo when script invoked).
+			fEcho_IfDebug "fCleanup() [in sudo loop]"
+		else
+			## Exiting script under normal execution
+			fEcho_IfDebug "fCleanup()"
+			if [ "${vmbLessVerbose}" != "true" ]; then
+				fEcho_Force ""
+			fi
+		fi
+	}
+
+
+	#########################################################################################
+	## Generic code - do not modify
+	#########################################################################################
+
+	##---------------------------------------------------------------------------------------
+	function fMath_Calc() {
+		##	Purpose: Performs math.
+		##	Input:
+		##		1 [optional]: Expression to calculate.
+		##		2 [optional]: The number of decimal places to round or zero-pad to. Defaults to nothing (no rounding).
+		##	Output:
+		##		Echos the result.
+		##	History:
+		##		20160922 JC: Created.
+		local vlsExpression="$1"
+		local vlsDecimalDigits="$2"
+		local vlsResult=""
+		#fEcho_VariableAndValue vlsExpression
+		#fEcho_VariableAndValue vlsDecimalDigits
+		vlsResult="$(echo "${vlsExpression}" | bc -l)"
+		if [ -n "${vlsDecimalDigits}" ]; then
+			if [ "$(fIsInteger "${vlsDecimalDigits}")" != "true" ]; then
+				fThrowError "fMath_Calc(): Second argument must be a positive integer, or empty."
+			else
+				## Round if significant digits longer then vlsDecimalDigits, or padd with zeros if shorter.
+				vlsResult="$(fMath_Round "${vlsResult}" "${vlsDecimalDigits}")"
+			fi
+		else
+			## Trim trailing zeroes
+			local vlsPrevious=""
+			local vlsLastChar=""
+			while [ "${vlsResult}" != "${vlsPrevious}" ]; do
+				#fEcho_VariableAndValue vlsResult
+				vlsPrevious="${vlsResult}"
+				vlsLastChar="$(fStrGetLastN "${vlsResult}" 1)"
+				#fEcho_VariableAndValue vlsLastChar
+				if [ "${vlsLastChar}" == "0" ] || [ "${vlsLastChar}" == "." ]; then
+					vlsResult="$(fStrRemoveLastN "${vlsResult}" 1)"
+				fi
+			done
+		fi
+		echo "${vlsResult}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fMath_Round() {
+		##	Purpose: Rounds a given number to a given number of decimal places.
+		##	Input:
+		##		1 [optional]: A number to round. If ommitted, =0.
+		##		2 [optional]: The number of decimal places to round to. Defaults to 0 (rounds to whole number).
+		##	Output:
+		##		Echos the result.
+		##	History:
+		##		20160922 JC: Created.
+		local vlsNumber="$1"; if [ -z "${vlsNumber}" ]; then vlsNumber=0; fi
+		local vlsDecimalDigits="$2"; if [ -z "${vlsDecimalDigits}" ]; then vlsDecimalDigits=0; fi
+		local vlsResult=""
+		if [ "$(fIsNumber "${vlsNumber}")" != "true" ]; then
+			fThrowError "fMath_Round(): First argument must be any number."
+		elif [ "$(fIsInteger "${vlsDecimalDigits}")" != "true" ]; then
+			fThrowError "fMath_Round(): Second argument must be a positive integer, or empty."
+		else
+			vlsResult=$(printf %.${vlsDecimalDigits}f $(echo "scale=${vlsDecimalDigits};(((10^${vlsDecimalDigits})*${vlsNumber})+0.5)/(10^${vlsDecimalDigits})" | bc))
+		fi
+		echo "${vlsResult}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fIsNumber() {
+		## 20141117 JC: Created.
+		## 20160922 JC: Bug fix, ".N" wasn't seen as a number.
+		if [[ "$1" =~ ^[-0]?[.]?[0-9]+([.][0-9]+)?$ ]]; then
+			echo "true"
+		else
+			echo "false"
+	   	fi
+	}
+	
+
+	##-------------------------------------------------------------------------
+	function fGet_VideoDriver() {
+		## Returns something like "nouveau", "nvidia", etc.
+		## 20160921 JC: Created.
+		local vlsReturn=""
+		vlsReturn="$(lsmod | grep -i 'drm_kms_helper ' | awk '{ print $4 }')"
+		vlsReturn="$(fStrToLower "${vlsReturn}")"
+		echo "${vlsReturn}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	declare vmsPrivate_IsVirtual=""
+	function fIsVirtual() {
+		## Detect virtualization
+		if [ -z "${vmsPrivate_IsVirtual}" ]; then
+			local vlsTemp=""
+			## Method 1: systemd-detect-virt
+			if [ "$(fIsInPath systemd-detect-virt)" == "true" ]; then 
+				fDefineTrap_Error_Ignore  ## ....................................................... Ignore errors
+					vlsTemp="$(systemd-detect-virt 2> /dev/null)"  ## .................... Check virtualization status with systemV
+				fDefineTrap_Error_Fatal  ## ........................................................ Reset error handling
+			fi
+			if [ -z "${vlsTemp}" ]; then
+				:  ## No change to vmsPrivate_IsVirtual
+			elif [ "${vlsTemp}" == "none" ]; then
+				vmsPrivate_IsVirtual="false"
+			else
+				vmsPrivate_IsVirtual="true"
+			fi
+			## Method 2: drive names
+			if [ -z "${vmsPrivate_IsVirtual}" ]; then
+				:
+			fi
+			## Finally
+			if [ -z "${vmsPrivate_IsVirtual}" ]; then
+				vmsPrivate_IsVirtual="unkown"
+			fi
+		fi
+		echo "${vmsPrivate_IsVirtual}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fMustBeInPath() {
+		## 20140206-07 JC: Created.
+		## 20160905 JC: Updated to use fIsInPath().
+		## 20160912 JC: Fixed bug that made it never return true.
+		fEcho_IfDebug "fMustBeInPath()"
+
+		local vlsCheck="$(fTrim $1)"
+		#fEcho_IfDebug_VariableAndValue "vlsCheck"
+
+		if [ -z "${vlsCheck}" ]; then
+			fThrowError "fMustBeInPath(): Nothing to check."
+		elif [ "$(fIsInPath "${vlsCheck}")" != "true" ]; then
+			fThrowError "The command “${vlsCheck}” must be in path, but isn’t."
+		fi
+	}
+	
+
+	##---------------------------------------------------------------------------------------
+	function fIsInPath() {
+		## 20160912 JC: Recreated because accidentally deleted at some point.
+		local vlsArg="$1"
+		local vlsReturn="false"
+		if [ -z "${vlsArg}" ]; then
+			fThrowError "fIsInPath(): Nothing to check."
+		else
+			local vlsWhich=""
+			fDefineTrap_Error_Ignore
+				vlsWhich="$(which ${vlsArg})"
+			fDefineTrap_Error_Fatal
+			if [ -n "${vlsWhich}" ]; then
+				vlsReturn="true"
+			fi
+		fi
+		echo "${vlsReturn}"
+	}
+	
+
+	##---------------------------------------------------------------------------------------
+	function fMustBeInPath_DEPRECATED() {
+		## 20140206-07 JC: Created.
+		## 20160912 JC: More tolerant of not in path.
+		fEcho_IfDebug "fMustBeInPath_DEPRECATED()"
+
+		local vlsCheck="$1"
+		#local vlsCheck="$(fTrim $1)"
+		#fEcho_IfDebug_VariableAndValue "vlsCheck"
+
+		if [ -z "${vlsCheck}" ]; then
+			fThrowError "fMustBeInPath_DEPRECATED(): Nothing to check."
+		else
+
+			local vlsWhich=""
+			fDefineTrap_Error_Ignore
+				vlsWhich="$(which ${vlsCheck})"
+			fDefineTrap_Error_Fatal
+			#fEcho_IfDebug "fMustBeInPath_DEPRECATED(): which ${vlsCheck} = ${cmsDoubleQuote_Open}${vlsWhich}${cmsDoubleQuote_Close})"
+
+			if [ -z "${vlsWhich}" ]; then
+				fThrowError "The command ${cmsDoubleQuote_Open}${vlsCheck}${cmsDoubleQuote_Close} must be in path, but isn’t."
+			fi
+
+		fi
+		
+	}
+	
+
+	##---------------------------------------------------------------------------------------
+	function fStrSearchAndReplace() {
+		##	Purpose: For every match in a string, substitutes a replacement.
+		##	Input:
+		##		- Source string.
+		##		- Search substring.
+		##		- Replacement substring.
+		##	Notes:
+		##		- Case-sensitve
+		##		- Performons only ONE pass - can't get stuck in a loop.
+		##		- Uses sed and tr for more robustness.
+		##	Returns:
+		##		Modified string via echo. Capture with: MyVariable="$(fStrSearchAndReplace "${MyVariable}")"
+		##	TODO:
+		##		Make sure can handle random strings with double quotes in them (as opposed to singular double quotes).
+		##	History:
+		##		- 20160906 JC: Rewrote from scratch to:
+		##			- Only make one pass.
+		##			- Use 'sed' instead of bash variable expansion, for more robust handling of:
+		##				- Double quotes.
+		##				- Escaped characters such as \n.
+
+		## Input
+		local vlsString="$1"
+		local vlsFind="$2"
+		local vlsReplace="$3"
+
+		## Temp replacements to avoid problems and trades speed for robustness
+		vlsStrOp="forward"
+		vlsString="$(fpStrOps_TempReplacements "${vlsString}")"
+		vlsFind="$(fpStrOps_TempReplacements "${vlsFind}")"
+		vlsReplace="$(fpStrOps_TempReplacements "${vlsReplace}")"
+
+		## Do the replacing
+		vlsString="$( echo "${vlsString}" | sed "s/${vlsFind}/${vlsReplace}/g" )"
+
+		## Reverse temp replacements
+		vlsStrOp="reverse"
+		vlsString="$(fpStrOps_TempReplacements "${vlsString}")"
+
+		echo -e "${vlsString}"
+		exit
+
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fpStrOps_TempReplacements() {
+		local vlsString="$@"
+		if [ "${vlsStrOp}" == "forward" ]; then
+			#vlsString="$( echo -e "${vlsString}" | sed -e ':a' -e 'N' -e '$!ba' -e 's/\n/_PLACEHOLDER_19544526_NEWILNE_/g' )"
+			vlsString="$( echo -e "${vlsString}" | sed ':a;N;$!ba;s/\n/_PLACEHOLDER_19544526_NEWILNE_/g' )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*\"*_PLACEHOLDER_44757925_DQUOTE_*g' )"
+			vlsString="$( echo -e "${vlsString}" | sed "s/'/_PLACEHOLDER_66824699_SQUOTE_/g" )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*\t*_PLACEHOLDER_54743014_TAB_*g' )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*\.*_PLACEHOLDER_24165191_DOT_*g' )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*\\*_PLACEHOLDER_99358465_BACKSLASH_*g' )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*/*_PLACEHOLDER_66037559_FWDSLASH_*g' )"  ## Can substitute any character for "/" delimiter in sed.
+		elif [ "${vlsStrOp}" == "reverse" ]; then
+			vlsString="$( echo -e "${vlsString}" | sed 's*_PLACEHOLDER_19544526_NEWILNE_*\n*g' )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*_PLACEHOLDER_44757925_DQUOTE_*\"*g' )"
+			vlsString="$( echo -e "${vlsString}" | sed "s/_PLACEHOLDER_66824699_SQUOTE_/'/g" )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*_PLACEHOLDER_54743014_TAB_*\t*g' )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*_PLACEHOLDER_24165191_DOT_*\.*g' )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*_PLACEHOLDER_99358465_BACKSLASH_*\\*g' )"
+			vlsString="$( echo -e "${vlsString}" | sed 's*_PLACEHOLDER_66037559_FWDSLASH_*/*g' )"  ## Can substitute any character for "/" delimiter in sed.
+		else
+			error
+		fi
+		echo "${vlsString}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrSearchAndReplace_Iterative() {
+		##	Purpose: For every match in a string, substitutes a replacement.
+		##	Notes:
+		##		- Case-sensitve
+		##		- Iterative - will keep looping until all matches are replaced.
+		##		- SLOW. But robust.
+		##	Returns:
+		##		Modified string via echo. Capture with: MyVariable="$(fStrSearchAndReplace "${MyVariable}")"
+		##	Notes:
+		##		- Be careful of unintended recursion. E.g. Replacing "man" with "woman" will result in an endless loop.
+		##	History:
+		##		- 20160906 JC: Created.
+
+		## Input
+		local vlsString="$1"
+		local vlsFind="$2"
+		local vlsReplace="$3"
+
+		## Replace all occurrences
+		if [ -n "${vlsString}" ]; then
+			local vlsPrevious=""
+			while [ "${vlsString}" != "${vlsPrevious}" ]; do
+				vlsPrevious="${vlsString}"
+				vlsString="$(fStrSearchAndReplace "${vlsString}" "${vlsFind}" "${vlsReplace}")"
+			done
+		fi
+		echo "${vlsString}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrGetFirstN() {
+		##	Purpose: Returns the first N characters from a string.
+		##	Arguments:
+		##		1 [optional]: The string in question.
+		##		2 [optional]: An integer >0
+		##			- If <=0 or empty, "" is returned.
+		##			- If > input length, input is returned unchanged.
+		##	History:
+		##		- 20160906 JC: Created.
+		local vlsInput="$1"
+		local vlwFirstN="$2"
+		local vlsReturn=""
+		if [ -n "${vlsInput}" ] && [ -n "${vlwFirstN}" ]; then
+			if [ "${vlwFirstN}" -lt 0 ]; then vlwFirstN="0"; fi
+			vlsReturn="${vlsInput:0:$vlwFirstN}"
+		fi
+		echo "${vlsReturn}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrGetLastN() {
+		##	Purpose: Returns the last N characters from a string.
+		##	Arguments:
+		##		1 [optional]: The string in question.
+		##		2 [optional]: An integer >0
+		##			- If <=0 or empty, "" is returned.
+		##			- If > input length, input is returned unchanged.
+		##	History:
+		##		- 20160906 JC: Created.
+		local vlsInput="$1"
+		local vlwLastN="$2"
+		local vlsReturn=""
+		if [ -n "${vlsInput}" ]; then
+			if [ -n "${vlwLastN}" ]; then
+				if [ "${vlwLastN}" -lt 0 ]; then vlwLastN="0"; fi
+				if [ "${#vlsInput}" -lt "${vlwLastN}" ]; then
+					vlsReturn="${vlsInput}"  ## The form below would return empty string in this case.
+				else
+					vlsReturn="${vlsInput: -${vlwLastN}}"
+				fi
+			fi
+		fi
+		echo "${vlsReturn}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrRemoveFirstN() {
+		##	Purpose: Removes the first N characters from a string.
+		##	Arguments:
+		##		1 [optional]: The string in question.
+		##		2 [optional]: An integer >0
+		##			- If <=0 or empty, input is returned unchanged.
+		##			- If > input length, "" is returned.
+		##	History:
+		##		- 20160906 JC: Created.
+		local vlsInput="$1"
+		local vlwFirstN="$2"
+		local vlsReturn=""
+		if [ -n "${vlsInput}" ]; then
+			if [ -z "${vlwFirstN}" ]; then
+				vlsReturn="${vlsInput}"  ## Return unchanged
+			else
+				if [ "${vlwFirstN}" -lt 0 ]; then vlwFirstN="0"; fi
+				vlsReturn="${vlsInput:$vlwFirstN}"
+			fi
+		fi
+		echo "${vlsReturn}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrRemoveLastN() {
+		##	Purpose: Removes the first N characters from a string.
+		##	Arguments:
+		##		1 [optional]: The string in question.
+		##		2 [optional]: An integer >0
+		##			- If <=0 or empty, input is returned unchanged.
+		##			- If > input length, "" is returned.
+		##	History:
+		##		- 20160906 JC: Created.
+		local vlsInput="$1"
+		local vlwLastN="$2"
+		local vlsReturn=""
+		if [ -n "${vlsInput}" ]; then
+			if [ -z "${vlwLastN}" ]; then
+				## LastN is empty, return input unchanged
+				vlsReturn="${vlsInput}"
+			elif [ "${vlwLastN}" -le "0" ]; then
+				## LastN <=0, return input unchanged
+				vlsReturn="${vlsInput}"
+			elif [ "${vlwLastN}" -ge "${#vlsInput}" ]; then
+				## LastN >= len; return ""
+				vlsReturn=""
+			else
+				## Remove the leftmost N characters
+				vlsReturn="${vlsInput::-$vlwLastN}"
+			fi
+		fi
+		echo "${vlsReturn}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrGetMiddle() {
+		##	Purpose: Returns some middle portion of a string.
+		##	Arguments:
+		##		1 [optional]: The string in question.
+		##		2 [optional]: 1-based starting position.
+		##			- If <=0 or empty, assumes 1.
+		##			- If > input length, "" is returned.
+		##		3 [optional]: Length to return from starting position, in # of characters.
+		##			- If <1 or empty, "" is returned.
+		##			- If starting position + length -1 > input length, assumes to the end of the string.
+		##	History:
+		##		- 20160906 JC: Created.
+		local vlsInput="$1"
+		local vlwStartPos="$2"
+		local vlwLen="$3"
+		local vlsReturn=""
+		if [ -n "${vlsInput}" ]; then
+			if [ -n "${vlwLen}" ]; then
+				if [ "${vlwLen}" -gt "0" ]; then
+					if [ "${vlwStartPos}" -le "${#vlsInput}" ]; then
+						if [ "${vlwStartPos}" -le "0" ]; then vlwStartPos="1"; fi
+						vlwStartPos=$(( ${vlwStartPos} - 1 ))  ## Bash uses 0 as start
+						vlsReturn="${vlsInput:${vlwStartPos}:${vlwLen}}"
+					fi
+				fi
+			fi
+		fi
+		echo "${vlsReturn}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrGetMatchPos() {
+		##	Purpose: Returns the 1-based starting location of a substring match within a larger string.
+		##	Arguments:
+		##		1 [optional]: The main string in question.
+		##			- If empty, return=0.
+		##		2 [optional]: The substring. Regular expression OK.
+		##			- If empty, return=0.
+		##	Returns: An integer:
+		##			- =0 if no match.
+		##			- >0 if a match found.
+		##	History:
+		##		- 20160906 JC: Created.
+		local vlsInput="$1"
+		local vlsSubstring="$2"
+		local vlwReturn="0"
+		if [ -n "${vlsInput}" ]; then
+			if [ -n "${vlsSubstring}" ]; then
+				vlwReturn="$( echo "${vlsInput}" | grep -Ebo "${vlsSubstring}" | cut -d: -f1 )"
+				if [ -n "${vlwReturn}" ]; then
+					vlwReturn=$(( $vlwReturn + 1 ))  ## Change to 1-based index.
+				else
+					vlwReturn="0"
+				fi
+			fi
+		fi
+		echo "${vlwReturn}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fStrSanitize() {
+		##	Purpose: Sanitizes a string in a way that result can be used as variable contents, file name, and/or folder name
+		##	TODO: Offer an argument to sanitize for different purposes.
+		##	History:
+		##		- 20160906 JC: Created.
+		local vlsString="$@"
+
+		local vlsPrevious=""
+		while [ "${vlsString}" != "${vlsPrevious}" ]; do
+			vlsPrevious="${vlsString}"
+
+			## Basic stuff
+			vlsString="$(echo "${vlsString}" | sed "s/\"//g" )"               ## double quotes with nothing
+			vlsString="$(echo "${vlsString}" | sed "s/'//g" )"                ## single quotes with nothing
+			vlsString="$(echo -e "${vlsString}" | tr '\n' '_' )"              ## newline with underscore
+			vlsString="$(echo "${vlsString}" | sed 's/\\/~/g' )"              ## backslash with tilde
+			vlsString="$(echo "${vlsString}" | sed 's/\//~/g' )"              ## forwardslash with tilde
+			vlsString="${vlsString/$/_}"                                      ## dollar with underscore 
+			vlsString="${vlsString/“/}"                                       ## Replace curly double open quotes with nothing
+			vlsString="${vlsString/”/}"                                       ## Replace curly double close quotes with nothing
+			vlsString="${vlsString/‘/}"                                       ## Replace curly double single quotes with nothing
+			vlsString="${vlsString/’/}"                                       ## Replace curly single close quotes with nothing
+			vlsString="${vlsString/\%/_}"                                     ## percent with underscore
+			vlsString="${vlsString/./_}"                                      ## Dot with underscore
+			vlsString="$(echo "${vlsString}" | sed 's*\t* *g' )"              ## Tab with space
+			vlsString="$(echo "${vlsString}" | sed 's/ /-/g' )"               ## One space with dash
+			vlsString="${vlsString/_-/-}"                                     ## Underscore dash, with dash
+			vlsString="${vlsString/-_/-}"                                     ## Dash underscore, with dash
+			vlsString="${vlsString/~-/~}"                                     ## tilde + dash -> tilde
+			vlsString="${vlsString/-~/~}"                                     ## dash + tilde+ -> tilde
+			vlsString="${vlsString/~_/~}"                                     ## tilde + underscore -> tilde
+			vlsString="${vlsString/_~/~}"                                     ## underscore + tilde -> tilde
+			vlsString="${vlsString/__/_}"                                     ## Double underscore with single underscore
+			vlsString="${vlsString/--/-}"                                     ## Double dash with single dash
+			vlsString="${vlsString/~~/~}"                                     ## Double tilde with single tilde
+
+			## Remove trailing stuff
+			local vlbCheckAgain="true"
+			while [ "${vlbCheckAgain}" == "true" ]; do
+				## Remove stuf from ends
+				case "${vlsString}" in
+					*" "|*"-"|*"_"|*"~"|*","|*".") vlsString="$(fStrRemoveLastN "${vlsString}" 1)" ;;
+					" "*|"-"*|"_"*|"~"*|","*|"."*) vlsString="$(fStrRemoveFirstN "${vlsString}" 1)" ;;
+				esac
+
+				## Check if we need to loop again
+				vlbCheckAgain="false"
+				case "${vlsString}" in
+					*" "|*"-"|*"_"|*"~"|*","|*".") vlbCheckAgain="true" ;;
+					" "*|"-"*|"_"*|"~"*|","*|"."*) vlbCheckAgain="true" ;;
+				esac
+			done
+
+		done
+
+		echo "${vlsString}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrAdd_WithSpace_SkipIfEmpty() {
+		##	Purpose: Adds a substring with a space to an existing string.
+		##	Input:
+		##		1: The variable name whose contents you wish to Add the new string to.
+		##		2: The contents to Add.
+		##	History:
+		##		- 20140927 JC: Created.
+		##		- 20160940 JC: Fixed curly-quote bug.
+		fEcho_IfDebug "fStrAdd_WithSpace_SkipIfEmpty()"
+		
+		## Input
+		local vlsVariableName="$1"
+		local vlsAddStr="$2"
+		
+		## Validation
+		if [ -z "${vlsVariableName}" ]; then fThrowError "fStrAdd_WithSpace_SkipIfEmpty(): No variable name was specified"; fi
+
+		## Logic
+		if [ -n "${vlsAddStr}" ]; then
+
+			## Init
+			local vlsContent="${!vlsVariableName}"
+
+			## Add a space to the content if it isn’t empty
+			if [ -n "${vlsContent}" ]; then
+				vlsContent="${vlsContent} "
+			fi
+			
+			## Add string to content
+			vlsContent="${vlsContent}${vlsAddStr}"
+			
+			## Store new content to named variable
+			eval "${vlsVariableName}=\"${vlsContent}\""
+
+		fi
+
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fFolderCannotHaveContents() {
+		## 20140206-07 JC: Created.
+		## 20160940 JC: Fixed curly-quote bug.
+		fEcho_IfDebug "fFolderCannotHaveContents()"
+		local vlsFolder="$@"
+		if [ "$(fDoesFolderHaveContents "${vlsFolder}")" == "true" ]; then
+			fThrowError "Files already exist in folder ${cmsDoubleQuote_Open}${vlsFolder}${cmsDoubleQuote_Close}"
+		fi
+	}
+	
+
+	##---------------------------------------------------------------------------------------
+	function fDoesFolderHaveContents() {
+		## 20140206-07 JC: Created.
+		## 20160940 JC: Fixed curly-quote bug.
+		local vlsFolder="$@"
+		local vlsReturn="false"
+		if [ -d "${vlsFolder}" ]; then
+			if [ -n "$(ls -A "${vlsFolder}")" ]; then
+				vlsReturn="true"
+			fi
+		fi
+		echo "${vlsReturn}"
+	}
+	
+
+	##---------------------------------------------------------------------------------------
+	function fGetSudo() {
+		## 20160904 JC: Updated to fully respect vmbLessVerbose
+		if [ "$(fIsSudoValid)" == "false" ] || [ "${vmbLessVerbose}" != "true" ]; then
+			fEcho "You may be prompted to enter password to verify sudo role ..."
+		fi
+		if [ "${vmbLessVerbose}" == "true" ]; then
+			sudo echo -n
+		else
+			sudo echo "[ Sudo role verified. ]"
+			fEcho_ResetBlankCounter
+		fi
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fIsRunning() {
+		local vlsProcName="$1"
+		local vlsReturn=""
+		if [ -n "${vlsProcName}" ]; then
+			local vlsGrepVal=""
+			vlsMeName="$(fGetFileName_OfMe)"
+			local vlsTempCmd="ps auxw |  grep -v 'grep' | grep -v '${vlsMeName}' | grep -i '${vlsProcName}'"
+			#local vlsTempCmd="pgrep -fc '${vlsProcName}'"
+			#local vlsTempCmd="ps -ef | awk '$NF~"${vlsProcName}" {print $2}'"
+			#local vlsTempCmd="ps -eux | awk '$NF~"${vlsProcName}" {print $2}'"
+			fDefineTrap_Error_Ignore
+				vlsGrepVal="$(eval "${vlsTempCmd}")"
+			fDefineTrap_Error_Fatal
+			#fEcho_VariableAndValue "vlsMeName"; fEcho_VariableAndValue "vlsTempCmd"; fEcho_VariableAndValue "vlsProcName"; fEcho_VariableAndValue "vlsGrepVal"
+			if [ -n "${vlsGrepVal}" ]; then
+				vlsReturn="true"
+			fi
+		fi
+		echo "${vlsReturn}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fKill() {
+		local vlsProcName="$1"
+		if [ -n "${vlsProcName}" ]; then
+			fDefineTrap_Error_Ignore
+				#fEchoAndDo "killall -I -w '$@' 2> /dev/null"
+				fEchoAndDo "pkill -f $@ &> /dev/null & disown"
+			fDefineTrap_Error_Fatal
+			sleep $cmwSleepSeconds
+		fi
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fGetFilespecOf() {
+		local vlsFilespec="$@"
+		local vlsReturn=""
+		fDefineTrap_Error_Ignore
+			if [ -n "${vlsFilespec}" ]; then
+				vlsFilespec="$(which "${vlsFilespec}" || echo "")"
+				if [ -n "${vlsFilespec}" ]; then
+					vlsFilespec="$(cd -P "$(dirname "${vlsFilespec}")" && pwd)/$(basename ${vlsFilespec})"  ## As found on interwebs.
+					if [ -n "${vlsFilespec}" ]; then
+						vlsReturn="${vlsFilespec}"
+					fi
+				fi
+			fi
+		fDefineTrap_Error_Fatal
+		echo "${vlsFilespec}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fGetFolderOf() {
+		local vlsFilespec="$@"
+		local vlsReturn=""
+		fDefineTrap_Error_Ignore
+			if [ -n "${vlsFilespec}" ]; then
+				vlsFilespec="$(fGetFilespecOf "${vlsFilespec}")"
+				vlsFilespec="$(cd -P "$(dirname "${vlsFilespec}")" && pwd)"  ## As found on interwebs.
+				vlsReturn="${vlsFilespec}"
+			fi
+		fDefineTrap_Error_Fatal
+		echo "${vlsReturn}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	fRunForked () {
+		## 20150504 JC: Created.
+		# detach stdout, stderr, stdin, run in background and disown handles
+		local vlsPid=""
+		echo "Disowned background execution:"
+		echo "Command ......: $@"
+		eval "$@" > /dev/null 2>&1 < /dev/null &
+		vlsPid=$!
+		disown $vlsPid
+		echo "PID ..........: ${vlsPid}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	fRunForked_AndLog () {
+		## 20150504 JC: Created.
+		# detach stdin, redirect stdout and stderr to log file, run in background and disown handles
+		#local vlsTimestamp=$(date "+%Y%m%d-%H%M%S")
+		local vlsPid=""
+		local vlsTempFile="/tmp/$(fGetFileName_OfMe).fRunForked_AndLog_$(fGetTimeStamp).log"
+		echo "Disowned background execution:"
+		echo "Command ......: $@"
+		echo "Output log ...: ${vlsTempFile}"
+		eval "$@" > "${vlsTempFile}" 2>&1 < /dev/null &
+		vlsPid=$!
+		disown $vlsPid
+		echo "PID ..........: ${vlsPid}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fIsInteger() {
+		## 20141117 JC: Created.
+		if [[ "$1" =~ ^-?[0-9]+$ ]]; then
+			echo "true"
+		else
+			echo "false"
+	   	fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fStrIndentAllLines() {
+		##	Purpose:
+		##		- For a multiline string, indent all lines.
+		##	History
+		##		- 20141003 JC: Created.
+		local clsFunctionName="fStrIndentAllLines"
+		fEcho_IfDebug "${clsFunctionName}()"
+
+		local vlsInput="$@"
+		local vlsReturn=""
+
+		if [ -n "${vlsInput}" ]; then
+			while read -r vlsLine; do
+				if [ -n "${vlsReturn}" ]; then
+					vlsReturn="${vlsReturn}\n"
+				fi
+				vlsReturn="${vlsReturn}    ${vlsLine}"
+			done <<< "${vlsInput}"
+		fi
+
+		echo -e "${vlsReturn}"
+
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEchoOrEchoAndDo_IgnoreError() {
+		##	Purpose:
+		##		- Echos what will be done, or echos it and does it.
+		##	Input:
+		##		1 [REQUIRED]: The command to echo [and possibly execute].
+		##		2 [optional]: "listonly" to just list and not execute.
+		##	History:
+		##		- 20141103 JC: Created.
+		local clsFunctionName="fEchoOrEchoAndDo_IgnoreError"
+		fEcho_IfDebug "${clsFunctionName}()"
+
+		local vlsListOnly="$(fStrToLower "$2")"
+
+		if [ "${vlsListOnly}" == "listonly" ]; then
+			echo "    $1"
+		else
+			fEchoAndDo_IgnoreError "$1"
+		fi
+
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEchoOrEchoAndDo() {
+		##	Purpose:
+		##		- Echos what will be done, or echos it and does it.
+		##	Input:
+		##		1 [REQUIRED]: The command to echo [and possibly execute].
+		##		2 [optional]: "listonly" to just list and not execute.
+		##	History:
+		##		- 20141103 JC: Created.
+		local clsFunctionName="fEchoOrEchoAndDo"
+		fEcho_IfDebug "${clsFunctionName}()"
+
+		local vlsListOnly="$(fStrToLower "$2")"
+
+		if [ "${vlsListOnly}" == "listonly" ]; then
+			echo "    $1"
+		else
+			fEchoAndDo "$1"
+		fi
+
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fNormalizePath() {
+		local clsFunctionName="fNormalizePath"
+		##	Purpose:
+		##		- Strips leading and trailing spaces from string.
+		##		- Strips ending slash from string
+		##			- So your code knows exactly the status of ending slash and can go from there.
+		##	History
+		##		- 20141011 JC: Created
+		
+		local vlsPath="$@"
+		if [ -n "${vlsPath}" ]; then vlsPath="${vlsPath#"${vlsPath%%[![:space:]]*}"}"; fi   ## Remove leading whitespace characters.
+		if [ -n "${vlsPath}" ]; then vlsPath="${vlsPath%"${vlsPath##*[![:space:]]}"}"; fi   ## Remove trailing whitespace characters.
+		if [ -n "${vlsPath}" ]; then vlsPath="${vlsPath%/}"; fi                             ## Remove trailing slash.
+		
+		echo "$vlsPath"
+    }
+
+	##---------------------------------------------------------------------------------------
+	function fpStrAppend_WithNewLine() {
+		local clsFunctionName="fpStrAppend_WithNewLine"
+		##	Purpose:
+		##		- Core function for fStrAppend_WithNewLine_*()
+		##		- If existing value is not empty, prepends a newline to the new string to add.
+		##	Input:
+		##		1: The variable name to append new contents to.
+		##		2: The contents to Add. If empty, then a new line is created anyway.
+		##	History:
+		##		- 20140911 JC: Created.
+		##		- 20140927 JC: Updated.
+		
+		## Arguments
+		local vlsVariableName="$1"
+		local vlsAddStr="$2"
+		local vlsFunctionNameOverride="$3"
+
+		## Init1
+		if [ -z "${vlsFunctionNameOverride}" ]; then vlsFunctionNameOverride="${clsFunctionName}"; fi
+		fEcho_IfDebug "${vlsFunctionNameOverride}()"
+		
+		## Validate
+		if [ -z "${vlsVariableName}" ]; then fThrowError "${vlsFunctionNameOverride}(): No variable name was specified"; fi
+		
+		## Init2
+		local vlsContent="${!vlsVariableName}"
+
+		## Add a new line to the end of the existing content if it isn’t empty, before the new content
+		if [ -n "${vlsContent}" ]; then
+			vlsContent="${vlsContent}$(fpNewLine "${vlsFunctionNameOverride}")"
+		fi
+		
+		## Add the new string to old content (even if it is empty)
+		vlsContent="${vlsContent}${vlsAddStr}"
+		
+		## Store new content to named variable
+		eval "${vlsVariableName}=\"${vlsContent}\""
+
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fStrAppend_WithNewLine_EvenIfArgEmpty() {
+		local clsFunctionName="fStrAppend_WithNewLine_EvenIfArgEmpty"
+		##	Purpose:
+		##		- Passes straight through to fStrAppend().
+		##	Input:
+		##		1: The variable name to Add the contents of.
+		##		2: The contents to Add. If empty, then a new line is created anyway.
+		##	History:
+		##		- 20140911 JC: Created.
+		##		- 20140927 JC: Updated.
+		##		- 20140929 JC: Updated.
+		fEcho_IfDebug "${clsFunctionName}()"
+		## Arguments
+		local vlsVariableName="$1"
+		local vlsAddStr="$2"
+		## Logic
+		fpStrAppend_WithNewLine "$1" "$2" "${clsFunctionName}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fStrAppend_WithNewLine_ErrorIfArgEmpty() {
+		local clsFunctionName="fStrAppend_WithNewLine_ErrorIfArgEmpty"
+		##	Purpose:
+		##		- Passes through to fpStrAppend_WithNewLine(), after validating that the new string to add is not empty (if it is, it throws an error).
+		##	Input:
+		##		1: The variable name to Add the contents of.
+		##		2: The contents to Add.
+		##	History:
+		##		- 20140911 JC: Created.
+		##		- 20140929 JC: Updated.
+		fEcho_IfDebug "${clsFunctionName}()"
+		
+		## Input
+		local vlsAddStr="$2"
+		
+		## Logic
+		if [ -z "${vlsAddStr}" ]; then
+			fThrowError "fStrAppend_WithNewLine_ErrorIfArgEmpty(): No content was specified to Add to variable ${cmsDoubleQuote_Open}${vlsVariableName}${cmsDoubleQuote_Close}."
+		else
+			fpStrAppend_WithNewLine "$1" "${vlsAddStr}" "${clsFunctionName}"
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fStrAppend_WithNewLine_SkipIfArgEmpty() {
+		local clsFunctionName="fStrAppend_WithNewLine_SkipIfArgEmpty"
+		##	Purpose:
+		##		- If the new string to add is not empty, this passes through to fpStrAppend_WithNewLine().
+		##	Input:
+		##		1: The variable name to Add the contents of.
+		##		2: The contents to Add.
+		##	History:
+		##		- 20140911 JC: Created.
+		##		- 20140929 JC: Updated.
+		fEcho_IfDebug "${clsFunctionName}()"
+		
+		## Input
+		local vlsAddStr="$2"
+		
+		## Logic
+		if [ -n "${vlsAddStr}" ]; then
+			fpStrAppend_WithNewLine "$1" "${vlsAddStr}" "${clsFunctionName}"
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fIsStringInFile() {
+		## 20140311 JC: Created
+		## Arg 1: String
+		## Arg 2: File
+		
+		local vlsString="$1"
+		local vlsFile="$2"
+
+		local vlsReturn="false"
+		
+		if [ -f "${vlsFile}" ]; then
+			fDefineTrap_Error_Ignore
+				local vlsContents="$(cat ${vlsFile} | grep ${vlsString})"
+			#	echo "vlsContents = ${cmsDoubleQuote_Open}${vlsContents}${cmsDoubleQuote_Close}"; exit 0
+			fDefineTrap_Error_Fatal
+			if [ -n "${vlsContents}" ]; then
+				vlsReturn="true"
+			fi
+		fi
+		
+		echo "${vlsReturn}"
+
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fStrRemoveWhitespace() { local vlsArgs="$@"; echo "${vlsArgs//[[:blank:]]/}"; }
+	function fStrToUpper() { echo "$@" | tr "[:lower:]" "[:upper:]"; }
+	function fStrToLower() { echo "$@" | tr "[:upper:]" "[:lower:]"; }
+
+	##---------------------------------------------------------------------------------------
+	function fStrReplaceWithCaseInsensitive() {
+		##	Purpose: For every a-z or A-Z character (let’s say "x"), replaces them with "[Xx]".
+		##	Uses:    For case-insensitive matching in tools such as rsync, tar - with not-quite-regex matching.
+		##	Returns: Modified string via echo. Capture with: MyVariable="$(fStrReplaceWithCaseInsensitive "${MyVariable}")"
+		##	History:
+		##		- 20140615 JC: Created.
+		local vlsInput="$@"
+		local vlsReturn=""
+		local vlsChar=""
+		## Character subs
+		for (( vliCount=0; vliCount<${#vlsInput}; vliCount++ )); do
+			vlsChar="${vlsInput:$vliCount:1}"
+			case "${vlsChar}" in
+				[a-zA-Z])
+					vlsReturn="${vlsReturn}[$(fStrToUpper "${vlsChar}")$(fStrToLower "${vlsChar}")]"
+					;;
+				*)
+					vlsReturn="${vlsReturn}${vlsChar}"
+					;;
+			esac
+		done
+		echo "${vlsReturn}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrSearchAndReplace_DEPRECATED() {
+		##	Purpose: For every match in a string, substitutes a replacement.
+		##	Input:
+		##		- Source string.
+		##		- Search substring (searches recursively).
+		##		- Replacement substring.
+		##	Notes:
+		##		- Case-sensitve
+		##		- Can get stuck in an endless loop if the replacement has the same subword as the find.
+		##		- Deprecated because there was no alternative to potentially getting stuck in a loop.
+		##	Returns: Modified string via echo. Capture with: MyVariable="$(fStrSearchAndReplace_DEPRECATED "${MyVariable}")"
+		##	History:
+		##		- 20140615 JC: Created.
+		##		- 20141002 JC: Replaces all occurrences in multiple passes.
+		##		- 20160906 JC: Deprecated.
+
+		## Input
+		local vlsString="$1"
+		local vlsFind="$2"
+		local vlsReplace="$3"
+
+		## Variables
+		local vlsPrevious=""		
+
+		## Replace all occurrences
+		while [ "${vlsString}" != "${vlsPrevious}" ]; do
+			vlsPrevious="${vlsString}"
+			vlsString="${vlsString//${vlsFind}/${vlsReplace}}"
+			if [ "${vlsString}" == "${vlsPrevious}" ]; then
+				break
+			fi
+		done
+
+		echo "${vlsString}"
+	}
+
+
+	##---------------------------------------------------------------------------------------
+	function fStrReplaceWithMultilinePermutations() {
+		##	Purpose: For every match in a string, substitutes a replacement..
+		##	Returns: Modified string via echo. Capture with: MyVariable="$(fStrSearchAndReplace_DEPRECATED "${MyVariable}")"
+		##	History:
+		##		- 20140615 JC: Created.
+
+		local vlsInput="$1"
+		local vlsFind="$2"
+		local -a vlsReplacements=("${@:3}")
+		local vlsCurrentReplacement=""
+		local vlsLastReplacement=""
+		local -a vlsReturnArray=""
+		local -i vliReturnArrayAddCount=0
+		local vlsTempReturnWithReplacements=""
+		local vlbAtLeastOneReplacementMade="false"
+		local vlsReturn=""
+
+		## The first return element is free
+		readarray -t vlsReturnArray <<<"$vlsInput"
+		#echo -e "DEBUG: vlsReturnArray[@]:\n$(printf -- '%s\n' "${vlsReturnArray[@]}")"; exit
+
+		if [ ${#vlsReturnArray[@]} -gt 0 ] && [ ${#vlsReplacements[@]} -gt 0 ]; then
+			while true; do
+				#echo; echo "DEBUG: Top of Main loop"
+
+				## Return array loop
+				local -a vlsTempArray=""
+				local -i vliTempArrayIndex=0
+				vlbAtLeastOneReplacementMade="false"
+				for vlsCurrentReturn in "${vlsReturnArray[@]}"; do
+					#echo "DEBUG: Top of Return array loop"
+					#echo "DEBUG: vlsCurrentReturn=${cmsDoubleQuote_Open}${vlsCurrentReturn}${cmsDoubleQuote_Close}"
+
+					## Replacement array loop
+					vlsLastReplacement="ThisWontMatchAnythingUseful_LKJDFKLjsdflkjsdflkjdfqoiuweyrlkjvliuyqwer"					
+					for vlsCurrentReplacement in "${vlsReplacements[@]}"; do
+						#echo "DEBUG: Top of Replacement array loop"
+						#echo "DEBUG: vlsLastReplacement   =${cmsDoubleQuote_Open}${vlsLastReplacement}${cmsDoubleQuote_Close}"
+						#echo "DEBUG: vlsCurrentReplacement=${cmsDoubleQuote_Open}${vlsCurrentReplacement}${cmsDoubleQuote_Close}"; sleep 1
+
+						if [ "${vlsCurrentReplacement}" == "${vlsLastReplacement}" ]; then
+							#echo "DEBUG: Replacement array loop break; current replacement same as last"; echo
+							break
+						else
+
+							## Replace only the first match 
+							vlsTempReturnWithReplacements="${vlsCurrentReturn/${vlsFind}/${vlsCurrentReplacement}}"
+							#echo "DEBUG: vlsTempReturnWithReplacements=${cmsDoubleQuote_Open}${vlsTempReturnWithReplacements}${cmsDoubleQuote_Close}"
+
+							if [ "${vlsTempReturnWithReplacements}" != "${vlsCurrentReturn}" ]; then
+
+								## Append replacement to temp array
+								#echo "DEBUG: vliTempArrayIndex=${cmsDoubleQuote_Open}${vliTempArrayIndex}${cmsDoubleQuote_Close}"
+								if [ $vliTempArrayIndex -le 0 ]; then
+									local -a vlsTempArray=("${vlsTempReturnWithReplacements}")
+								else
+									local -a vlsTempArray=("${vlsTempArray[@]}" "${vlsTempReturnWithReplacements}")
+								fi
+								#echo -e "DEBUG: vlsTempArray[@]:\n$(printf -- '%s\n' "${vlsTempArray[@]}")"
+								#echo "DEBUG: new size of vlsTempArray = ${cmsDoubleQuote_Open}${#vlsTempArray[@]}${cmsDoubleQuote_Close}"; echo
+								vliTempArrayIndex=($vliTempArrayIndex+1)
+								vlbAtLeastOneReplacementMade="true"
+
+							fi
+						fi
+						vlsLastReplacement="${vlsCurrentReplacement}"
+					done
+					#echo "DEBUG: Replacement array loop end; no more replacement items"; echo
+
+				done
+				#echo "DEBUG: Return array loop end; no more return array items"; echo
+
+				## Replace the return array with temp
+				if [ "${vlbAtLeastOneReplacementMade}" == "true" ]; then
+					#echo "DEBUG: vliReturnArrayAddCount=${cmsDoubleQuote_Open}${vliReturnArrayAddCount}${cmsDoubleQuote_Close}"
+					local -a vlsReturnArray=("${vlsTempArray[@]}")
+					#echo -e "DEBUG: vlsReturnArray[@]:\n$(printf -- '%s\n' "${vlsReturnArray[@]}")"
+					#echo "DEBUG: new size of vlsReturnArray = ${cmsDoubleQuote_Open}${#vlsReturnArray[@]}${cmsDoubleQuote_Close}"; echo
+					vliReturnArrayAddCount=($vliReturnArrayAddCount+1)
+				else
+					#echo "DEBUG: Return array loop break; no more replacements to make"; echo
+					break
+				fi
+
+				#echo -e "\nDEBUG: Bottom of main loop.\nvlsReturnArray[@]:\n$(printf -- '%s\n' "${vlsReturnArray[@]}")"
+			done
+			#echo "DEBUG: Recursive array loop end; no more matches"; echo
+		fi
+		## Build output string
+		vlsReturn="$(printf -- '%s\n' "${vlsReturnArray[@]}")"
+		
+		## Return value
+		echo -e "${vlsReturn}"
+	}
+	## Test
+	#	clear; echo "$(fStrReplaceWithMultilinePermutations "OK□to□delete" "□" "" "[X]" "[Y]")"; exit 0
+	
+	##---------------------------------------------------------------------------------------
+	function fEchoExpandedMatchV2() {
+		##	Returns many permutations of a match, expanded to multiple lines with line breaks - for --exclude-from and --include-from with RSync, Tar, etc.
+		##	Special input characters:
+		##		"A"		         = "[Aa]"							All alphabetic characters are case-insensitive 
+		##		"₴"		(U+20B4) = "[a-zA-Z]"						Exactly one alpha match
+		##		"₦"		(U+20A6) = "[0-9]"							Exactly one numeric match
+		##		"✻"		(U+25CB) = Null, and "[a-zA-Z]"				Zero or exactly one alpha match
+		##		"△"		(U+25B3) = Null, and "[0-9]"				Zero or exactly one numeric match
+		##		"□"	(U+25A1) = Null, and "[^0-9a-zA-Z]"			Zero or exactly one non-alphanum match
+		##		"▶"		(U+25B6) = "**/", "**[^0-9a-zA-Z]", and ""	Beginning of directory or non alphanumeric character
+		##		"◀"		(U+25C0) = "/**", "[^0-9a-zA-Z]**", and ""	End of directory or non alphanumeric character
+
+		local vlsReturn="$@"
+		if [ -n "${vlsReturn}" ]; then
+			vlsReturn="$(fStrReplaceWithCaseInsensitive "${vlsReturn}")"
+			vlsReturn="$(fStrSearchAndReplace_DEPRECATED "${vlsReturn}" "₴" "[a-zA-Z]")"
+			vlsReturn="$(fStrSearchAndReplace_DEPRECATED "${vlsReturn}" "₦" "[0-9]")"
+			vlsReturn="$(fStrReplaceWithMultilinePermutations "${vlsReturn}" "✻" "" "[a-zA-Z]")"
+			vlsReturn="$(fStrReplaceWithMultilinePermutations "${vlsReturn}" "△" "" "[0-9]")"
+			vlsReturn="$(fStrReplaceWithMultilinePermutations "${vlsReturn}" "□" "" "[^0-9a-zA-Z]")"
+			vlsReturn="$(fStrReplaceWithMultilinePermutations "${vlsReturn}" "▶" "" "**[^0-9a-zA-Z]")"
+			vlsReturn="$(fStrReplaceWithMultilinePermutations "${vlsReturn}" "◀" "" "/" "[^0-9a-zA-Z]**")"
+		fi
+
+		echo "${vlsReturn}"
+	}
+	## Test
+	#	clear; fEchoExpandedMatchV2 "▶1a2₴3₦4✻5△6□7◀"; exit 0
+	#	clear; fEchoExpandedMatchV2 "▶1"; exit 0
+	#	clear; fEchoExpandedMatchV2 "▶1◀"; exit 0
+	#	clear; cmsExcludeList_Folder="${HOME}/tmp"; cmsExcludeList_Filespec="${HOME}/tmp/debug_$(basename $0)_fInit_ExcludesFile.txt"; fInit_ExcludesFile; gedit "${cmsExcludeList_Filespec}" &> /dev/null & disown; sleep 5; rm "${cmsExcludeList_Filespec}"; exit 0
+
+	##---------------------------------------------------------------------------------------
+	function fDo_IgnoreError() {
+		## 20140520 JC: Created
+		fDefineTrap_Error_Ignore
+			eval "$@"
+		fDefineTrap_Error_Fatal
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEchoAndDo_IgnoreError() {
+		## 20140520 JC: Created
+		fEcho "Executing: eval ${cmsDoubleQuote_Open}$@${cmsDoubleQuote_Close}"
+		fDefineTrap_Error_Ignore
+			eval "$@"
+		fDefineTrap_Error_Fatal
+	}
+
+	## ----------------------------------------------------------------------------------------
+	function fStrTrim() {
+		## Trims leading and trailing whitespace characters from a string
+		## To use this function: MyString="$(fTrimString ${cmsDoubleQuote_Open}${MyString}${cmsDoubleQuote_Close}")"
+		## 20140519 JC: Created
+		## 20141002 JC: Updated
+		## 20160827 JC: Ignores error i.
+
+		## Input
+		local vlsInput="$@"
+		local vlsOutput=""
+
+		if [ -n "${vlsInput}" ]; then
+			## Constants
+			local clsPattern="[[:space:]]*([^[:space:]]|[^[:space:]].*[^[:space:]])[[:space:]]*"
+
+			## General-purpose method for removal
+			fDefineTrap_Error_Ignore
+			    [[ \"${vlsInput}\" =~ \"${clsPattern}\" ]]
+			    vlsOutput="${BASH_REMATCH[1]}"
+			fDefineTrap_Error_Fatal
+		fi
+		echo -n "${vlsOutput}"
+
+	}
+	
+	
+	##---------------------------------------------------------------------------------------
+	function fDoFunctionAs_SpecifiedUser() {
+		## 20140311 JC: Created
+		fEcho_IfDebug "fDoFunctionAs_SpecifiedUser()"
+		local vlsFunctionName="$1"
+		local vlsUserName="$2"
+		local vlsArgs="${@:3}"
+		if [ -n "${vlsFunctionName}" ]; then
+			if [ -n "${vlsUserName}" ]; then
+				if [ "${USER}" == "${vlsUserName}" ]; then
+					## Already running as sudo, so just do invoke the function directly.
+					## 20140224 JC: Fixed bug by removing quotes.
+					$vlsFunctionName ${vlsArgs}
+				else
+					## Need to call self re-entrantly as sudo. The execution control section at bottom will handle reentrancy and function calling.
+					local vlsPath_Me="$(fGetFilePathOf_Me)"
+					sudo -H -u $cmsRunAsUser bash -c "${vlsPath_Me} reentrant_do_function ${vlsFunctionName} ${vlsArgs}"
+				fi
+			else
+				fThrowError "fDoFunctionAs_SpecifiedUser(): Programmer error - no username specified as an argument."
+			fi
+		else
+			fThrowError "fDoFunctionAs_SpecifiedUser(): Programmer error - no function name specified as an argument."
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fGetWhich() {
+		##	Echos:
+		##		Results "which" but without erroring.
+		##	History:
+		##		- 20140304 JC: Created.
+		local vlsReturn=""
+		fDefineTrap_Error_Ignore
+			vlsReturn="$(which $@ 2> /dev/null)"
+		fDefineTrap_Error_Fatal
+		echo "${vlsReturn}"
+	}	
+
+	##---------------------------------------------------------------------------------------
+	function fGetUname() {
+		##	Echos:
+		##		Results of uname -s or uname -o
+		##	History:
+		##		- 20140304 JC: Created.
+		
+		local vlsReturn=""
+		
+		## Get major name
+		fDefineTrap_Error_Ignore
+			vlsReturn="$(uname -s 2> /dev/null)"
+			if [ -z "${vlsReturn}" ]; then
+				vlsReturn="$(uname -o 2> /dev/null)"
+			fi
+		fDefineTrap_Error_Fatal
+		
+		## Sanitize
+		if [ -z "${vlsReturn}" ]; then
+			vlsReturn="unknown"
+		fi
+		vlsReturn="${vlsReturn,,}"
+		
+		## Returns
+		echo "${vlsReturn}"
+
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fGetPlatform() {
+		##	Echos:
+		##		cygwin, macosx, or linux
+		##	History:
+		##		- 20140304 JC: Created.
+		local vlsReturn=""
+		local vlsUname="$(fGetUname)"
+		case "${vlsUname}" in
+			"linux")
+				vlsReturn="linux"
+			;;
+			"darwin")
+				vlsReturn="macosx"
+			;;
+			"sunos")
+				vlsReturn="solaris"
+			;;
+			"cygwin")
+				vlsReturn="windows"
+			;;
+			"mingw")
+				vlsReturn="windows"
+			;;
+			"freebsd")
+				vlsReturn="bsd"
+			;;
+			"netbsd")
+				vlsReturn="bsd"
+			;;
+			"openbsd")
+				vlsReturn="bsd"
+			;;
+			"freebsd")
+				vlsReturn="bsd"
+			;;
+			*)
+				vlsReturn="${vlsUname}"
+			;;
+		esac
+		echo "${vlsReturn}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fGetOS() {
+		##	Echos:
+		##		ubuntu, linuxmint, solaris, cygwin, etc.
+		##	History:
+		##		- 20140304 JC: Created.
+		##	TODO: Test on different platforms.
+		local vlsReturn=""
+		local vlsUname="$(fGetUname)"
+		local vlsPlatform="$(fGetPlatform)"
+		local vlsLsbReleaseIs=""
+		fDefineTrap_Error_Ignore
+			vlsLsbReleaseIs="$(lsb_release -is 2> /dev/null)"
+			vlsLsbReleaseIs="${vlsLsbReleaseIs,,}"
+		fDefineTrap_Error_Fatal
+
+
+		case "${vlsPlatform}" in
+			"linux")
+				vlsReturn="${vlsLsbReleaseIs}"
+			;;
+			"macosx")
+				vlsReturn="${vlsLsbReleaseIs}"
+			;;
+			"solaris")
+				vlsReturn="${vlsLsbReleaseIs}"
+			;;
+			"windows")
+				vlsReturn="$(fGetUname)"
+			;;
+			*)
+				vlsReturn="unknown"
+			;;
+		esac
+		echo "${vlsReturn}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fIsOS_DebianBased() {
+		##	Echos: true or false
+		##	History:
+		##		- 20140304 JC: Created.
+		local vlsReturn="false"
+		if [ "$(fGetPlatform)" == "linux" ]; then
+			case "$(fGetOS)" in
+				debian )
+					vlsReturn="true"
+				;;
+				ubuntu | xubuntu | kubuntu | lubuntu )
+					vlsReturn="true"
+				;;
+				mint | linuxmint )
+					vlsReturn="true"
+				;;
+			esac
+		fi
+		echo "${vlsReturn}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fIsOS_FedoraBased() {
+		##	Echos: true or false
+		##	History:
+		##		- 20140304 JC: Created.
+		local vlsReturn="false"
+		if [ "$(fGetPlatform)" == "linux" ]; then
+			case "$(fGetOS)" in
+				fedora | redhat | centos | oraclelinux )
+					vlsReturn="true"
+				;;
+			esac
+		fi
+		echo "${vlsReturn}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fGetPreferredEditor_GUI() {
+		## 20140224 JC: Created
+		## 20160831 JC: Greatly improved, with conditional checking of sudo and handling of Geany "domain socket" error.
+		local vlsReturn=""
+		local vlsTest=""
+
+		## If sudo
+		if [ "$(fIsSudo)" == "true" ]; then
+			vlsTest="geany";      if [ -z "${vlsReturn}" ]; then if [ "$(fIsInPath ${vlsTest})" == "true" ]; then vlsReturn="${vlsTest} -c /tmp/geany_root_socket"; fi; fi
+			vlsTest="sublime";    if [ -z "${vlsReturn}" ]; then if [ "$(fIsInPath ${vlsTest})" == "true" ]; then vlsReturn="${vlsTest}"; fi; fi
+
+		## Not sudo
+		else
+			vlsTest="sublime";    if [ -z "${vlsReturn}" ]; then if [ "$(fIsInPath ${vlsTest})" == "true" ]; then vlsReturn="${vlsTest}"; fi; fi
+			vlsTest="geany";      if [ -z "${vlsReturn}" ]; then if [ "$(fIsInPath ${vlsTest})" == "true" ]; then vlsReturn="${vlsTest}"; fi; fi
+		fi
+
+		## The rest
+		if [ -z "${vlsReturn}" ]; then
+			vlsTest="pluma";      if [ -z "${vlsReturn}" ]; then if [ "$(fIsInPath ${vlsTest})" == "true" ]; then vlsReturn="${vlsTest}"; fi; fi
+			vlsTest="mousepad";   if [ -z "${vlsReturn}" ]; then if [ "$(fIsInPath ${vlsTest})" == "true" ]; then vlsReturn="${vlsTest}"; fi; fi
+			vlsTest="leafpad";    if [ -z "${vlsReturn}" ]; then if [ "$(fIsInPath ${vlsTest})" == "true" ]; then vlsReturn="${vlsTest}"; fi; fi
+			vlsTest="gedit";      if [ -z "${vlsReturn}" ]; then if [ "$(fIsInPath ${vlsTest})" == "true" ]; then vlsReturn="${vlsTest}"; fi; fi
+		fi
+
+		## Return
+		if [ -z "${vlsReturn}" ]; then
+			fThrowError "No suitable GUI editor installed on system."
+		else
+			echo "${vlsReturn}"
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fGetPreferredEditor_CLI() {
+		## 20140224 JC: Created
+		local vlsReturn=""
+		if   [ "$(fIsInPath nano)" == "true" ]; then
+			vlsReturn="nano"
+		elif [ "$(fIsInPath pico)" == "true" ]; then
+			vlsReturn="pico"
+		elif [ "$(fIsInPath vi)" == "true" ]; then
+			vlsReturn="vi"
+		else
+			fThrowError "No suitable CLI editor installed on system."
+		fi
+		echo "${vlsReturn}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fPromptYN() {
+		## 20140219 JRC: Copied/refactored from fPromptToRunScript().
+		fEcho_IfDebug "fPromptYN()"
+
+		local vlsTemp=""
+		local -l vlsResponse=""
+		
+		read -p "Continue? (Y/n) " vlsTemp
+		vlsResponse="${vlsTemp,,}"  ## Convert to lower-case
+		fEcho_ResetBlankCounter
+		
+		case "$vlsResponse" in
+			("y"|"ye"|"yes")
+				:
+			;;
+			(*)
+				fEcho "User declined."
+				fEcho ""
+				exit 0
+			;;
+		esac
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fPromptToRunScript() {
+		## 20130514 JRC: Copied from old jclibrary001-v001 and stripped down to its essentials.
+		## 20140219 JC:
+		##		- Moved logic into fPromptYN()
+		##		- Renamed from fPromptToRunScript().
+		fEcho_IfDebug "fPromptToRunScript()"
+		fpGenericWrapper_ShowDescriptionAndCopyright
+		fPromptYN
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fFilesysObjectCannotExist() {
+		## 20170723-07 JC: Created.
+		fEcho_IfDebug "fFilesysObjectCannotExist()"
+
+		local vlsArg="$@"
+		local vlbDoesExist="true"  ## Until proven otherwise
+
+		## Test
+		if [ ! -d "${vlsArg}" ]; then
+			if [ ! -f "${vlsArg}" ]; then
+				if [ ! -L "${vlsArg}" ]; then
+					vlbDoesExist="false"
+				fi
+			fi
+		fi
+
+		## Act
+		if [ "${vlbDoesExist}" == "true" ]; then
+			fThrowError "File system object must not exist: ${cmsDoubleQuote_Open}${vlsArg}${cmsDoubleQuote_Close}"
+		fi
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fFolderMustExist() {
+		## 20140219 JC: Created.
+		fEcho_IfDebug "fFolderMustExist()"
+		local vlsArg="$@"
+		if [ ! -d "${vlsArg}" ]; then
+			fThrowError "Folder doesn’t exist: ${cmsDoubleQuote_Open}${vlsArg}${cmsDoubleQuote_Close}"
+		fi
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fFolderCannotExist() {
+		## 20140219-07 JC: Created.
+		fEcho_IfDebug "fFolderCannotExist()"
+		local vlsArg="$@"
+		if [ -d "${vlsArg}" ]; then
+			fThrowError "Folder must not exist: ${cmsDoubleQuote_Open}${vlsArg}${cmsDoubleQuote_Close}"
+		fi
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fIsInvokedFromCLI() {
+		## 20140219 JC: Copied/refactored/simplified from "...0-common/includes/...".
+		local -l vlbTemp="false"
+		if [ -t 0 ]; then
+			vlbTemp="true"
+		fi
+		echo "${vlbTemp}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fMsgBlocking() {
+		## 20140219 JC: Copied/refactored/simplified from "...0-common/includes/...".
+		fEcho_IfDebug "fMsgBlocking()"
+		
+		local vlsMessage="$@"
+		local vlsScriptName="$(fGetFileName_OfMe)"
+		
+		if [ "$(fIsInvokedFromCLI)" == "true" ]; then
+			if [ -z "${vlsMessage}" ]; then vlsMessage="Press [ENTER] when ready."; fi
+			read -p "${vlsMessage}"
+		else
+			if [ -z "${vlsMessage}" ]; then vlsMessage="Press [OK] when ready."; fi
+			zenity --info --title "${vlsScriptName} Pause" --text "${vlsMessage}"
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fIsSessionGUI() {
+		## 20140219 JC: Copied/refactored/simplified from "...0-common/includes/...".
+		local -l vlbTemp="false"
+		if [ -n "${DISPLAY}" ]; then
+			vlbTemp="true"
+		fi
+		echo "${vlbTemp}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEdit() {
+		## 20160827 JC: Created.
+		fEcho_IfDebug "fEdit()"
+		if [ "$(fIsSessionGUI)" == "true" ]; then
+			fEdit_GUI_NonBlocking "$@"
+		else
+			fEdit_CLI "$@"
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEdit_Blocking() {
+		## 20140219 JC: Copied/refactored/simplified from "...0-common/includes/...".
+		fEcho_IfDebug "fEdit_Blocking()"
+		if [ "$(fIsSessionGUI)" == "true" ]; then
+			fEdit_GUI_Blocking "$@"
+		else
+			fEdit_CLI "$@"
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEdit_GUI_Blocking() {
+		## 20140219 JC: Copied/refactored/simplified from "...0-common/includes/...".
+		## 20160827 JC: Removed required argument constraint.
+		fEcho_IfDebug "fEdit_GUI()"
+		if [ "$(fIsInvokedFromCLI)" == "true" ]; then
+			fEcho "Editing ${cmsDoubleQuote_Open}$@${cmsDoubleQuote_Close}; script will resume when editor is closed."
+			$(fGetPreferredEditor_GUI) "$@" &> /dev/null
+		else
+			fEdit_GUI_NonBlocking
+			fMsgBlocking "Press [OK] when you are finished editing."
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEdit_GUI_NonBlocking() {
+		## 20140219 JC: Copied/refactored/simplified from "...0-common/includes/...".
+		## 20160827 JC: Removed required argument constraint.
+		fEcho_IfDebug "fEdit_GUI_NonBlocking()"
+		$(fGetPreferredEditor_GUI) "$@" &> /dev/null & disown
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEdit_CLI() {
+		## 20140219 JC: Copied/refactored/simplified from "...0-common/includes/...".
+		## 20160827 JC: Removed required argument constraint.
+		fEcho_IfDebug "fEdit_CLI()"
+		local vlsFile="$@"
+		$(fGetPreferredEditor_CLI) "${vlsFile}"
+		if [ -f "${vlsFile}" ]; then
+			fEcho_ResetBlankCounter
+			fEcho ""
+			echo "------------------------------------ BOF --------------------------------------"
+			cat "${vlsFile}"
+			echo "------------------------------------ EOF --------------------------------------"
+			fEcho_ResetBlankCounter
+			fEcho ""
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fPing() {
+		## 20140219 JC: Copied/refactored/simplified from "jcPing".
+		fEcho_IfDebug "fPing()"
+		
+		local vlsAddress="$1"
+		local vlsReply=""
+		
+		## Do the ping.
+		fDefineTrap_Error_Ignore
+			#vlsReply="$((ping -c 1 -w 2 -W 2 ${vlsAddress}  | grep icmp_ ) 2> /dev/null)"  ## This line screws up several text editor's formatting from here on
+			vlsReply="$(ping -c 1 -w 2 -W 2 ${vlsAddress}  | grep icmp_ 2> /dev/null)"
+		fDefineTrap_Error_Fatal
+		
+		##	Unused ping options:
+		##		-D .......... Print timestamp
+		
+		## Note if no reply
+		if [ -z "${vlsReply}" ]; then vlsReply="(Unreachable, error, and/or no reply.)"; fi
+		
+		## Pad output
+		vlsFill='...........'
+		local vlsOutput=""
+		local vlsTimestamp=$(date "+%Y%m%d-%H%M%S")
+		vlsOutput=$(printf "%s %s $vlsReply\n" $vlsAddress ${vlsFill:${#vlsAddress}})
+		echo "[ ${vlsTimestamp} ] ${vlsOutput}"
+		
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fMakeDir() {
+		## 20140219 JC: Copied/refactored/simplified from "jcinit_custom-folders-and-symlinks2".
+		fEcho_IfDebug "fMakeDir()"
+
+		local vlsFolderPath="$1"
+		
+		if [ "${mlbCheckOnly}" == "true" ]; then
+			## Check only
+
+			if [ -d "${vlsFolderPath}" ]; then
+				fEcho "FYI: The directory ${cmsDoubleQuote_Open}${vlsFolderPath}${cmsDoubleQuote_Close} already exists."
+			fi
+
+		else
+			## Do it
+
+			## Make the folder
+			fEchoAndDo "mkdir -p ${vlsFolderPath}"
+
+		fi
+		
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fMakeSymlink() {
+		## 20140219 JC: Copied/refactored/simplified from "jcinit_custom-folders-and-symlinks2".
+		fEcho_IfDebug "fMakeSymlink()"
+
+		local vlsSource="$1"
+		local vlsLink="$2"
+		local clsExistsAndNotLink="Object ${cmsDoubleQuote_Open}${vlsFolderPath}${cmsDoubleQuote_Close} exists and is not a symlink."
+
+		if [ "${mlbCheckOnly}" == "true" ]; then
+			## Check only
+
+			if [ -e "${vlsSource}" ]; then
+				if [ -e "${vlsLink}" ]; then
+					if [ -h "${vlsLink}" ]; then
+						fEcho "FYI: The symlink ${cmsDoubleQuote_Open}${vlsLink}${cmsDoubleQuote_Close} already exists but will be deleted and re-created."
+					else
+						fThrowError "${clsExistsAndNotLink}"
+					fi
+				else
+					if [ -h "${vlsLink}" ]; then
+						fEcho "FYI: The symlink ${cmsDoubleQuote_Open}${vlsLink}${cmsDoubleQuote_Close} is a broken symlink and will be deleted and re-created."
+					fi
+				fi
+			else
+				fEcho "FYI: Source doesn’t exist to link to: ${cmsDoubleQuote_Open}${vlsSource}${cmsDoubleQuote_Close}"
+			fi
+
+		else
+			## Do it
+
+			## Just to be safe, double-check that it is a symlink before deleting it
+			if [ -e "${vlsLink}" ]; then
+				if [ -h "${vlsLink}" ]; then
+					## Remove the existing link
+					fEchoAndDo "rm ${vlsLink}"
+				else
+					## It’s not a link; throw an error to avoid deleting data
+					fThrowError "${clsExistsAndNotLink}"
+				fi
+			else
+				if [ -h "${vlsLink}" ]; then
+					## It’s a dead link; delete it
+					fEchoAndDo "rm ${vlsLink}"
+				fi
+			fi
+
+			## Create the new link
+			if [ -e "${vlsSource}" ]; then
+				fEchoAndDo "ln -s ${vlsSource} ${vlsLink}"
+			fi
+
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEcho_VariableAndValue() {
+		## 20140206-07 JC: Copied/refactored/simplified from "...0-common/includes/...".
+		local vlsVariableName="$1"
+		if [ -z "${vlsVariableName}" ]; then
+			fThrowError "fEcho_VariableAndValue(): No variable to echo value of."
+		else
+			local vlsValue="${!vlsVariableName}"
+			fEcho "${vlsVariableName} = ${cmsDoubleQuote_Open}${vlsValue}${cmsDoubleQuote_Close}"
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEcho_IfDebug_VariableAndValue() {
+		## 20140206-07 JC: Copied/refactored/simplified from "...0-common/includes/...".
+		local vlsVariableName="$1"
+		if [ -z "${vlsVariableName}" ]; then
+			fThrowError "fEcho_IfDebug_VariableAndValue(): No variable to echo value of."
+		else
+			local vlsValue="${!vlsVariableName}"
+			fEcho_IfDebug "${vlsVariableName} = ${cmsDoubleQuote_Open}${vlsValue}${cmsDoubleQuote_Close}"
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEcho_Clean() {
+		## 20140206-07 JC: Updated with "fold" to wrap at words.
+		if [ -n "$1" ]; then
+			local -i vliActualCols=$(tput cols)
+			local -i vliMaxIdealCols=200
+			local -i vliColumns=$(fMath_Int_Min $vliActualCols $vliMaxIdealCols)
+			echo "$@" | fold -s -w $vliColumns
+			vmbLastLineWasBlank="false"
+		else
+			if [ "${vmbLastLineWasBlank}" != "true" ]; then
+				echo
+			fi
+			vmbLastLineWasBlank="true"
+		fi
+	}
+	declare vmbLastEchoWasBlank="false"
+	
+	##------------------------------------------------------------------------------
+	function fMath_Int_Max() {
+		## Echos the maximum of two integers
+		## 20140206-07 JC: Created.
+		local -i vliArg1=$1
+		local -i vliArg2=$2
+		local -i vliReturn=0
+		if [ $vliArg1 > $vliArg2 ]; then
+			vliReturn=vliArg1
+		else
+			vliReturn=vliArg2
+		fi
+		echo $vliReturn
+	}
+
+	##------------------------------------------------------------------------------
+	function fMath_Int_Min() {
+		## Echos the minimum of two integers
+		## 20140206-07 JC: Created.
+		local -i vliArg1=$1
+		local -i vliArg2=$2
+		local -i vliReturn=0
+		if [ $vliArg1 -lt $vliArg2 ]; then
+			vliReturn=vliArg1
+		else
+			vliReturn=vliArg2
+		fi
+		echo $vliReturn
+	}
+
+	##------------------------------------------------------------------------------
+	function fPrintLineTerminalWidth() {
+		## 20140206-07 JC: Created.
+		local -i vliCount
+		local -i vliColumns=$(tput cols)
+		local clsCharacter="—" ## ▞▚▒░▓䷀█▂▁▔—
+		local vlsOutput=""
+		for ((vliCount = 1 ; vliCount <= vliColumns ; vliCount++)); do
+			vlsOutput="${vlsOutput}${clsCharacter}"
+		done	
+		#echo
+		echo "$(tput setaf 5)${vlsOutput}$(tput sgr 0)"
+		#echo
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fAppendToFile() {
+		## 20140206-07 JC: Created.
+		fEcho_IfDebug "fAppendToFile()"
+		
+		local vlsFile="$1"
+		local vlsWhatToOutput="${@:2}"
+		
+		fVariableCannotBeEmpty "vlsFile"
+
+		echo "${vlsWhatToOutput}" >> "${vlsFile}"
+		
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fAppendCommentToFile() {
+		fEcho_IfDebug "fAppendCommentToFile()"
+		
+		local vlsFile="$1"
+		local vlsWhatToOutput="${@:2}"
+
+		if [ -z "${vlsWhatToOutput}" ]; then
+			vlsWhatToOutput="##"
+		else
+			vlsWhatToOutput="## ${vlsWhatToOutput}"
+		fi
+		
+		fAppendToFile "${vlsFile}" "${vlsWhatToOutput}"
+		
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fVariableCannotBeEmpty() {
+		## 20140206-07 JC: Created.
+		fEcho_IfDebug "fVariableCannotBeEmpty()"
+
+		#local vlsCallingFunction="$1"  ## Too hard to remember to include this
+		local vlsVariableName="$1"
+		local vlsVariableValue="${!vlsVariableName}"
+
+		if [ -z "${vlsVariableValue}" ]; then
+			fThrowError "The variable ${cmsDoubleQuote_Open}${vlsVariableName}${cmsDoubleQuote_Close} cannot be empty."
+		fi
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fFunctionArgumentCannotBeEmpty() {
+		## 20140206-07 JC: Created.
+		fEcho_IfDebug "fFunctionArgumentCannotBeEmpty()"
+
+		local vlsCallingFunction="$1"
+		local vlsVariableOrdinal="$2"
+		local vlsVariableValue="$3"
+
+		if [ -z "${vlsVariableValue}" ]; then
+			fThrowError "Parameter ${vlsVariableOrdinal} of function ${vlsCallingFunction} cannot be empty."
+		fi
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fFileMustExist() {
+		## 20140206-07 JC: Created.
+		fEcho_IfDebug "fFileMustExist()"
+		local vlsFile="$@"
+		#fEcho_IfDebug_VariableAndValue "vlsFile"
+		if [ ! -f "${vlsFile}" ]; then
+			fThrowError "File does not exist: ${cmsDoubleQuote_Open}${vlsFile}${cmsDoubleQuote_Close}"
+		fi
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fFileCannotExist() {
+		## 20140206-07 JC: Created.
+		fEcho_IfDebug "fFileCannotExist()"
+		local vlsFile="$@"
+		if [ -f "${vlsFile}" ]; then
+			fThrowError "File must not exist: ${cmsDoubleQuote_Open}${vlsFile}${cmsDoubleQuote_Close}"
+		fi
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fDoesFolderExist() {
+		## 20140206-07 JC: Created.
+		local vlsFolder="$@"
+		local vlsReturn="false"
+		if [ -d "${vlsFolder}" ]; then
+			vlsReturn="true"
+		fi
+		echo "${vlsReturn}"
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fDoesFileExist() {
+		## 20140206-07 JC: Created.
+		local vlsFile="$@"
+		local vlsReturn="false"
+		if [ -f "${vlsFile}" ]; then
+			vlsReturn="true"
+		fi
+		echo "${vlsReturn}"
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fDoesFileOrFolderExist() {
+		## 20140206-07 JC: Created.
+		local vlsFileOrFolder="$@"
+		local vlsReturn="false"
+		if [ -e "${vlsFileOrFolder}" ]; then
+			vlsReturn="true"
+		fi
+		echo "${vlsReturn}"
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fGetTimeStamp() {
+		##	Purpose:
+		##		Returns a numerically sequential, minimally-formatted serial number based on date and time.
+		##		By default, the format is "YYYYMMDD-HHMMSS".
+		##	Arguments:
+		##		1: Decimals of fractional seconds (0-6; defaults to 0).
+		## 		2: Delimiter between date and time (defaults to "-").
+		## 		3: Delimiter between time and fractional seconds (defaults to ".").
+		##	History:
+		##		- 20140129 JC: Created.
+		##		- 20160725 JC: Updated:
+		##			- Optional millisecond output with specified precision.
+		##			- Optional delimiter overrides between date and time, and time and milliseconds.
+		fEcho_IfDebug "fGetTimeStamp()"
+
+		## Arguments
+		local vlsFractionalSecondsDigits="$1"
+		local vlsDelimiter1="$2"
+		local vlsDelimiter2="$3"
+		local vlsFormat=""
+		local vlsReturn=""
+
+		## Validate args and set defaults
+		if [ -z "${vlsDelimiter1}" ]; then vlsDelimiter1="-"; fi
+		if [ -n "${vlsFractionalSecondsDigits}" ]; then 
+			vlsFractionalSecondsDigits="%${vlsFractionalSecondsDigits}N"
+			if [ -z "${vlsDelimiter2}" ]; then vlsDelimiter2="."; fi
+		else
+			vlsDelimiter2=""
+		fi
+
+		## Get formatted date, e.g. command: date "+%Y%m%d-%H%M%S.%4N"
+		vlsFormat="+%Y%m%d${vlsDelimiter1}%H%M%S${vlsDelimiter2}${vlsFractionalSecondsDigits}"  #"+%Y%m%d-%H%M%S.%4N"
+		vlsReturn="$(date "${vlsFormat}")"
+
+		## Return
+		echo "${vlsReturn}"
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fDoFunctionAs_Sudo() {
+		fEcho_IfDebug "fDoFunctionAs_Sudo()"
+		local vlsFunctionName="$1"
+		local vlsArgs="${@:2}"
+		if [ -n "${vlsFunctionName}" ]; then
+			if [ "$(fIsSudo)" == "true" ]; then
+				## Already running as sudo, so just do invoke the function directly.
+				## 20140224 JC: Fixed bug by removing quotes.
+				$vlsFunctionName ${vlsArgs}
+			else
+				## Need to call self re-entrantly as sudo. The execution control section at bottom will handle reentrancy and function calling.
+				local vlsPath_Me="$(fGetFilePathOf_Me)"
+				fGetSudo
+				sudo $vlsPath_Me "reentrant_do_function" "${vlsFunctionName}" "${vlsArgs}"
+			fi
+		else
+			fThrowError "fDoFunctionAs_Sudo(): Programmer error - no function name specified as an argument."
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fIsSudo() {		
+		local -l vlbReturn="false"
+		if [ "$(id -u)" == "0" ]; then 
+			vlbReturn="true"
+		fi
+		echo "${vlbReturn}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fIsSudoValid() {
+		fDefineTrap_Error_Ignore
+			local -l vlbReturn="false"
+			## First check to see if we are already sudo
+			if [ "$(id -u)" == "0" ]; then 
+				vlbReturn="true"
+			else
+				## Next, check to see if sudo is still cached
+				sudo -n echo &> /dev/null
+				if [ $? -eq 0 ]; then
+					vlbReturn="true"
+				fi
+			fi		
+			echo "${vlbReturn}"
+		fDefineTrap_Error_Fatal
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fDoFunction_Forked_AndLog() {
+		fEcho_IfDebug "fDoFunction_Forked_AndLog()"
+		local vlsFunctionName="$1"
+		local vlsArgs="${@:2}"
+		if [ -n "${vlsFunctionName}" ]; then
+			## Need to call self re-entrantly as sudo. The execution control section at bottom will handle reentrancy and function calling.
+			local vlsPath_Me="$(fGetFilePathOf_Me)"
+			fRunForked_AndLog "$vlsPath_Me" "reentrant_do_function" "${vlsFunctionName}" "${vlsArgs}"
+		else
+			fThrowError "fDoFunction_Forked_AndLog(): Programmer error - no function name specified as an argument."
+		fi
+		fEcho_ResetBlankCounter
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fGetFilePathOf_Me() {
+		local vlsFileName="${BASH_SOURCE[2]}"   ## I invented/discovered this but have no idea why it works. No answers on interwebs.
+		local vlsReturnValue_FilePath="$(cd -P "$(dirname "${vlsFileName}")" && pwd)/$(basename ${vlsFileName})"  ## As found on interwebs.
+		echo "${vlsReturnValue_FilePath}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fGetFileName_OfMe() {
+		local vlsFileName="${BASH_SOURCE[2]}"   ## I invented/discovered this but have no idea why it works. No answers on interwebs.
+		local vlsReturnValue_FileName="$(basename "${vlsFileName}")"
+		echo "${vlsReturnValue_FileName}"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEcho() {
+		if [ -n "$1" ]; then
+			fEcho_Clean "[ $@ ]"
+		else
+			fEcho_Clean ""
+		fi
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fEcho_Force() {
+		fEcho_ResetBlankCounter
+		fEcho "$@"
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fEcho_IfDebug() {
+		if [ "${cmbDebug}" == "true" ]; then
+			echo "--- Debug: $@"
+		fi
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fEchoAndDo() {
+		fEcho "Executing: eval ${cmsDoubleQuote_Open}$@${cmsDoubleQuote_Close}"
+		if [ "${cmbEchoAndDo_EchoOnly}" != "true" ]; then
+			eval "$@"
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEchoAndDo_Async() {
+		fEcho "Executing: eval ${cmsDoubleQuote_Open}$@${cmsDoubleQuote_Close} & disown"
+		eval "$@" & disown
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEchoAndDo_HideAllOutput() {
+		fEcho "Executing: eval ${cmsDoubleQuote_Open}$@${cmsDoubleQuote_Close} &> /dev/null"
+		eval "$@" &> /dev/null
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEchoAndDo_Async_HideAllOutput() {
+		fEcho "Executing: eval ${cmsDoubleQuote_Open}$@${cmsDoubleQuote_Close} &> /dev/null & disown"
+		eval "$@" &> /dev/null & disown
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEchoAndDo_HideNonError() {
+		fEcho "Executing: eval ${cmsDoubleQuote_Open}$@${cmsDoubleQuote_Close} > /dev/null"
+		eval "$@" > /dev/null
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fThrowError() {
+		#fEcho_IfDebug "fThrowError()"
+		fDefineTrap_Error_Fatal
+		fpErrMsg "$@"
+		exit 1
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fEcho_ResetBlankCounter() {
+		vmbLastLineWasBlank="false"
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fDefineTrap_Error_Fatal() {
+		#fEcho_IfDebug "fDefineTrap_Error_Fatal()"
+		true
+		trap 'fTrap_Error_Fatal ${LINENO}' ERR
+		set -e
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fDefineTrap_Error_Ignore() {
+		fEcho_IfDebug "fDefineTrap_Error_Ignore()"
+		trap 'fTrap_Error_Ignore' ERR
+		set +e
+	}
+
+
+	#########################################################################################
+	## Private functions (not intended to be user-callable)
+	#########################################################################################
+
+	##---------------------------------------------------------------------------------------
+	function fpErrMsg() {
+		## 20160905 JC: Updated to output to CLI and/or GUI.
+		#Calculate the message
+		local vlsErrMsg=""
+		if [ -n "$1" ]; then
+			vlsErrMsg="Error: $@"
+		else
+			vlsErrMsg="An error occurred."
+		fi
+		if [ -t 0 ]; then
+			## Show the message in CLI
+			echo "[ ${vlsErrMsg} ]"
+			if [ -n "${DISPLAY}" ]; then
+				## Also show non-blocking message in GUI
+				notify-send "${vlsErrMsg}"
+			fi
+		elif [ -n "${DISPLAY}" ]; then
+			## Show blocking message in GUI
+			zenity --error --text="${vlsErrMsg}" --ellipsize
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fpTrap_Exit() {
+		fEcho_IfDebug "fpTrap_Exit()"
+		fCleanup
+	}
+
+	## ----------------------------------------------------------------------------------------
+	function fTrap_Error_Fatal() {
+		## Generic: Visually indicates that an error happened.	
+		## 20140519 JC: Updated with additional info.
+
+		local lineNumber="$1"
+		local errorDescription="$2"
+		local errorCode="${3:-1}"
+		
+		echo
+		fEcho "An error occurred:"
+
+		## Script
+		fEcho_Clean "    In script .....: $(fGetFileName_OfMe)"
+
+		## Line number
+		if [ -n "${lineNumber}" ]; then
+			fEcho_Clean "    Near line# ....: ${lineNumber}"
+		fi
+		
+		## Error code
+		if [ -n "${errorCode}" ]; then
+			fEcho_Clean "    Error code ....: ${errorCode}"
+		fi
+		
+		## Description
+		if [ -n "${errorDescription}" ]; then
+			fEcho_Clean "    Description ...: ${errorDescription}"
+		fi
+
+	}
+	
+	##---------------------------------------------------------------------------------------
+	function fTrap_Error_Ignore() {
+		#fEcho_IfDebug "fTrap_Error_Ignore()"
+		true
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fpGenericWrapper_ShowDescriptionAndCopyright() {
+		#fEcho_IfDebug "fpGenericWrapper_ShowDescriptionAndCopyright()"
+		if [ ! "${vmbWasShown_DescriptionAndCopyright}" == "true" ]; then
+			vmbWasShown_DescriptionAndCopyright="true"
+		#	fEcho ""
+			fDescriptionAndCopyright
+		#	fEcho ""
+		fi
+	}
+
+	##---------------------------------------------------------------------------------------
+	function fpGenericWrapper_ShowSyntaxAndQuit() {
+		#fEcho_IfDebug "fpGenericWrapper_ShowSyntaxAndQuit()"
+	#	fEcho ""
+		fpGenericWrapper_ShowDescriptionAndCopyright
+		fEcho ""
+		fSyntax
+		fEcho ""
+		exit 1
+	}
+
+
+	#########################################################################################
+	## Initial settings and execution control
+	#########################################################################################
+
+	## Error handling
+	set -E  ## sourced scripts honor error handling
+	fDefineTrap_Error_Fatal
+	trap 'fpTrap_Exit' INT TERM EXIT
+	
+	## Include
+	source 0_library_temp
+	source 0_library
+
+	## Constants and variables
+	declare -r cmsDoubleQuote_Open="“"; declare -r cmsDoubleQuote_Close="”"; declare -r cmsSingleQuote_Open="‘"; declare -r cmsSingleQuote_Close="’"; declare -r cmsApostrophe="${cmsSingleQuote_Close}"
+	declare vmbWasShown_DescriptionAndCopyright="false"
+	if [ -z "${vmbInSudoSection}" ]; then declare vmbInSudoSection=""; fi
+	if [ -z "${vmbInAsUserSection}" ]; then declare vmbInAsUserSection=""; fi	
+	
+	case "${1,,}" in
+	
+		("-h"|"--help"|"/h"|"/help"|"/?")
+
+			#######################################################################
+			## Help
+			#######################################################################
+
+			fpGenericWrapper_ShowSyntaxAndQuit
+			;;
+
+		(*)
+
+			#######################################################################
+			## Main entry point
+			#######################################################################
+
+			if [ "${vmbLessVerbose}" != "true" ]; then 
+				fPrintLineTerminalWidth
+			fi
+			fEcho_IfDebug "Main entry point"
+			if [ -n "${cmwNumberOfRequiredArgs}" ]; then
+				if [ $# -ge $cmwNumberOfRequiredArgs ]; then
+					#echo "OK for fMain."
+					if [ "${cmbAlwaysShowDescriptionAndCopyright}" == "true" ] && [ "${vmbLessVerbose}" != "true" ]; then
+						fpGenericWrapper_ShowDescriptionAndCopyright
+					fi
+					fMain "$@"
+				else
+					#echo "No args."
+					fpGenericWrapper_ShowSyntaxAndQuit
+				fi
+			else
+				fThrowError "The variable ${cmsDoubleQuote_Open}cmwNumberOfRequiredArgs${cmsDoubleQuote_Close} is required but not declared."
+			fi
+				
+		;;
+	esac
